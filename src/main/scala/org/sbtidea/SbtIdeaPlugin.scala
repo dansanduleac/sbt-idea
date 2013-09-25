@@ -61,22 +61,17 @@ object SbtIdeaPlugin extends Plugin {
     val uri = buildStruct.root
     val name: Option[String] = settings.optionalSetting(ideaProjectName)
     val projectList = {
-      def getProjectList(proj: ResolvedProject): List[(ProjectRef, ResolvedProject)] = {
-        def processAggregates(aggregates: List[ProjectRef]): List[(ProjectRef, ResolvedProject)] = {
-          aggregates match {
-            case Nil => List.empty
-            case ref :: tail => {
-              Project.getProject(ref, buildStruct).map{subProject =>
-                (ref -> subProject) +: getProjectList(subProject) ++: processAggregates(tail)
-              }.getOrElse(processAggregates(tail))
-            }
-          }
+      def getProjectList(proj: ResolvedProject): Seq[(ProjectRef, ResolvedProject)] = {
+        def processAggregates(aggregates: Seq[ProjectRef]): Seq[(ProjectRef, ResolvedProject)] = {
+            for (ref        <- aggregates;
+                 subProject <- Project.getProject(ref, buildStruct).toSeq; // Option.flatMap should not be used here
+                 expanded   <- (ref -> subProject) +: getProjectList(subProject)) yield expanded
         }
-        processAggregates(proj.aggregate.toList)
+        processAggregates(proj.aggregate)
       }
 
       SortedMap.empty[ProjectRef, ResolvedProject] ++ buildUnit.defined.flatMap {
-        case (id, proj) => (ProjectRef(uri, id) -> proj) :: getProjectList(proj)
+        case (id, proj) => (ProjectRef(uri, id) -> proj) +: getProjectList(proj)
       }
     }
 
@@ -85,11 +80,11 @@ object SbtIdeaPlugin extends Plugin {
 
     val allProjectIds = projectList.values.map(_.id).toSet
     val subProjects = projectList.collect {
-      case (projRef, project) if (!ignoreModule(projRef)) => projectData(projRef, project, buildStruct, state, args, allProjectIds, buildUnit.localBase)
+      case (projRef, project) if !ignoreModule(projRef) => projectData(projRef, project, buildStruct, state, args, allProjectIds, buildUnit.localBase)
     }.toList
 
     val scalaInstances = subProjects.map(_.scalaInstance).distinct
-    val scalaLibs = (sbtInstance :: scalaInstances).map(toIdeaLib(_))
+    val scalaLibs = (sbtInstance :: scalaInstances).map(toIdeaLib)
     val ideaLibs = subProjects.flatMap(_.libraries.map(modRef => modRef.library)).toList.distinct
 
     val projectInfo = IdeaProjectInfo(buildUnit.localBase, name.getOrElse("Unknown"), subProjects, ideaLibs ::: scalaLibs)

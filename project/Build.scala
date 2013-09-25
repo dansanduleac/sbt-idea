@@ -31,7 +31,7 @@ object SbtIdeaBuild extends Build with BuildExtra {
   ) ++ addSbtPlugin("com.hanhuy.sbt" % "android-sdk-plugin" % "0.9.3" % "provided")
 
 
-  def extraPom = (
+  def extraPom =
     <url>http://your.project.url</url>
     <licenses>
       <license>
@@ -50,5 +50,5 @@ object SbtIdeaBuild extends Build with BuildExtra {
       <name>Mikko Peltonen</name>
       <url>http://github.com/mpeltonen</url>
     </developer>
-  </developers>)
+  </developers>
 }
