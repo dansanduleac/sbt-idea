@@ -183,6 +183,35 @@ object SbtIdeaPlugin extends Plugin {
 
       settings.settingWithDefault(Keys.unmanagedSourceDirectories in config, Nil) ++ managedSourceDirs ++ baseDirs
     }
+
+    def isAggregate(p: String) = allProjectIds.toSeq.contains(p)
+    val classpathDeps = project.dependencies.filterNot(d => isAggregate(d.project.project)).flatMap { dep =>
+      Seq(Compile, Test) map { scope =>
+        (settings.setting(Keys.classDirectory in scope, "Missing class directory", dep.project), settings.setting(Keys.sourceDirectories in scope, "Missing source directory", dep.project))
+      }
+    }
+
+    val androidSupport = AndroidSupport(project, projectRoot, buildStruct, settings)
+
+    val dependencyLibs = {
+      val librariesExtractor = new SbtIdeaModuleMapping.LibrariesExtractor(buildStruct, state, projectRef, scalaInstance,
+        withClassifiers = if (args.contains(NoClassifiers)) None else {
+          Some((settings.setting(ideaSourcesClassifiers, "Missing idea-sources-classifiers"), settings.setting(ideaJavadocsClassifiers, "Missing idea-javadocs-classifiers")))
+        }
+      )
+      librariesExtractor.allLibraries.map { lib: IdeaModuleLibRef =>
+      // If this is Android project, change scope of android.jar and Scala library to provided,
+      // to prevent IDEA from dexing them when running.
+        def shouldNotDex(libName: String) = libName.equals("android.jar") || libName.contains(":scala-library:")
+        if (androidSupport.isAndroidProject && shouldNotDex(lib.library.name)) lib.copy(config = IdeaLibrary.ProvidedScope) else lib
+      }
+    }
+
+    val basePackage = settings.setting(ideaBasePackage, "missing IDEA base package")
+    val packagePrefix = settings.setting(ideaPackagePrefix, "missing package prefix")
+    val extraFacets = settings.settingWithDefault(ideaExtraFacets, NodeSeq.Empty)
+    val includeScalaFacet = settings.settingWithDefault(ideaIncludeScalaFacet, true)
+
     def resourceDirectoriesFor(config: Configuration) = {
       settings.settingWithDefault(Keys.unmanagedResourceDirectories in config, Nil)
     }
@@ -194,30 +223,7 @@ object SbtIdeaPlugin extends Plugin {
     }
     val compileDirectories: Directories = directoriesFor(Configurations.Compile)
     val testDirectories: Directories = directoriesFor(Configurations.Test).addSrc(sourceDirectoriesFor(Configurations.IntegrationTest)).addRes(resourceDirectoriesFor(Configurations.IntegrationTest))
-    val librariesExtractor = new SbtIdeaModuleMapping.LibrariesExtractor(buildStruct, state, projectRef, scalaInstance,
-      withClassifiers = if (args.contains(NoClassifiers)) None else {
-        Some((settings.setting(ideaSourcesClassifiers, "Missing idea-sources-classifiers"), settings.setting(ideaJavadocsClassifiers, "Missing idea-javadocs-classifiers")))
-      }
-    )
-    val basePackage = settings.setting(ideaBasePackage, "missing IDEA base package")
-    val packagePrefix = settings.setting(ideaPackagePrefix, "missing package prefix")
-    val extraFacets = settings.settingWithDefault(ideaExtraFacets, NodeSeq.Empty)
-    val includeScalaFacet = settings.settingWithDefault(ideaIncludeScalaFacet, true)
-    def isAggregate(p: String) = allProjectIds.toSeq.contains(p)
-    val classpathDeps = project.dependencies.filterNot(d => isAggregate(d.project.project)).flatMap { dep =>
-      Seq(Compile, Test) map { scope =>
-        (settings.setting(Keys.classDirectory in scope, "Missing class directory", dep.project), settings.setting(Keys.sourceDirectories in scope, "Missing source directory", dep.project))
-      }
-    }
 
-
-    val androidSupport = AndroidSupport(project, projectRoot, buildStruct, settings)
-    val dependencyLibs = librariesExtractor.allLibraries.map { lib: IdeaModuleLibRef =>
-      // If this is Android project, change scope of android.jar and Scala library to provided,
-      // to prevent IDEA from dexing them when running.
-      def shouldNotDex(libName: String) = libName.equals("android.jar") || libName.contains(":scala-library:")
-      if (androidSupport.isAndroidProject && shouldNotDex(lib.library.name)) lib.copy(config = IdeaLibrary.ProvidedScope) else lib
-    }
     SubProjectInfo(baseDirectory, projectName, project.uses.map(_.project).filter(isAggregate).toList, classpathDeps, compileDirectories,
       testDirectories, dependencyLibs, scalaInstance, ideaGroup, None, basePackage, packagePrefix, extraFacets, scalacOptions,
       includeScalaFacet, androidSupport)
