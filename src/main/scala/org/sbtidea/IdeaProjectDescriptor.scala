@@ -123,7 +123,7 @@ class IdeaProjectDescriptor(val projectInfo: IdeaProjectInfo, val env: IdeaProje
         "scala_compiler.xml" -> (if (env.useProjectFsc) Some(scalaCompilerXml) else None),
         "highlighting.xml" -> (if (env.enableTypeHighlighting) Some(highlightingXml) else None)
       ) foreach {
-        case (fileName, Some(xmlNode)) if (!configFile(fileName).exists) =>  saveFile(configDir, fileName, xmlNode)
+        case (fileName, Some(xmlNode)) if !configFile(fileName).exists =>  saveFile(configDir, fileName, xmlNode)
         case _ =>
       }
 
@@ -135,7 +135,7 @@ class IdeaProjectDescriptor(val projectInfo: IdeaProjectInfo, val env: IdeaProje
       }
       for (ideaLib <- projectInfo.ideaLibs) {
         // MUST all be _
-        val filename = ideaLib.name.replaceAll("[:\\.\\s-]", "_") + ".xml"
+        val filename = ideaLib.name.replaceAll("[:\\.\\s/-]", "_") + ".xml"
         saveFile(librariesDir, filename, libraryTableComponent(ideaLib))
       }
 
