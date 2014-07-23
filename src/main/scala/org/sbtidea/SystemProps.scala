@@ -1,8 +1,10 @@
 package org.sbtidea
 
+import org.sbtidea.ValueClasses.JdkName
+
 object SystemProps {
-  val jdkName = System.getProperty("java.version").substring(0, 3)
-  val languageLevel = "JDK_" + jdkName.replace(".", "_")
+  val jdkName = JdkName(System.getProperty("java.version").substring(0, 3))
+  val languageLevel = ValueClasses.formatLanguageLevel(jdkName)
   val runsOnWindows = System.getProperty("os.name").contains("Windows")
   val userHome = {
     val system = System.getProperty("user.home")

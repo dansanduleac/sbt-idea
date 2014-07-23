@@ -2,6 +2,8 @@ package org.sbtidea
 
 import android.AndroidSupport
 import java.io.File
+import org.sbtidea.ValueClasses.{JdkName, LanguageLevel}
+
 import xml.NodeSeq
 
 // cheating for now
@@ -62,7 +64,7 @@ case class IdeaProjectInfo(baseDir: File, name: String, childProjects: List[SubP
 
 case class IdeaUserEnvironment(webFacet: Boolean)
 
-case class IdeaProjectEnvironment(projectJdkName :String, javaLanguageLevel: String,
+case class IdeaProjectEnvironment(projectJdkName :JdkName, javaLanguageLevel: LanguageLevel,
                                   includeSbtProjectDefinitionModule: Boolean, projectOutputPath: Option[String],
                                   excludedFolders: Seq[String], compileWithIdea: Boolean, modulePath: String, useProjectFsc: Boolean,
                                   enableTypeHighlighting: Boolean, deleteExistingLibraries: Boolean)

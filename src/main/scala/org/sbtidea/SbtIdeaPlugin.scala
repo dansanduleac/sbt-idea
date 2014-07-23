@@ -1,6 +1,7 @@
 package org.sbtidea
 
 import android.AndroidSupport
+import org.sbtidea.ValueClasses.JdkName
 import sbt._
 import sbt.complete.Parsers._
 import java.io.File
@@ -91,7 +92,16 @@ object SbtIdeaPlugin extends Plugin {
 
     val excludeFolders = settings.settingWithDefault(ideaExcludeFolders, Nil) :+ "target"
 
-    val env = IdeaProjectEnvironment(projectJdkName = SystemProps.jdkName, javaLanguageLevel = SystemProps.languageLevel,
+    val javacOpts = settings.task(Keys.javacOptions)
+    // Derive the JDK version (and language level) to use from javacOpts (-source and -target flags)
+    // TODO improve this to also query the java exec at `javaHome` for its version, before falling back to using sbt's runtime jdk version
+    val jdkName = javacOpts.sliding(2).collectFirst { case Seq("-target", v) => JdkName(v) } getOrElse SystemProps.jdkName
+
+    val javaLanguageLevel = javacOpts.sliding(2).collectFirst {
+      case Seq("-source", v) => ValueClasses.formatLanguageLevel(JdkName(v))
+    } getOrElse SystemProps.languageLevel
+
+    val env = IdeaProjectEnvironment(projectJdkName = jdkName, javaLanguageLevel = javaLanguageLevel,
       includeSbtProjectDefinitionModule = !args.contains(NoSbtBuildModule), projectOutputPath = None, excludedFolders = excludeFolders,
       compileWithIdea = false, modulePath = ".idea_modules", useProjectFsc = !args.contains(NoFsc),
       enableTypeHighlighting = !args.contains(NoTypeHighlighting), deleteExistingLibraries = !args.contains(DontDeleteExistingLibs))
