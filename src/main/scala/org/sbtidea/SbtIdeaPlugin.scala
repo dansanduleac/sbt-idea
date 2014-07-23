@@ -57,7 +57,7 @@ object SbtIdeaPlugin extends Plugin {
     val extracted = Project.extract(state)
     val buildStruct = extracted.structure
     val buildUnit = buildStruct.units(buildStruct.root)
-    val settings = Settings(extracted.currentRef, buildStruct, state)
+    implicit val settings = Settings(extracted.currentRef, buildStruct, state)
 
     val uri = buildStruct.root
     val name: Option[String] = settings.optionalSetting(ideaProjectName)
@@ -92,14 +92,7 @@ object SbtIdeaPlugin extends Plugin {
 
     val excludeFolders = settings.settingWithDefault(ideaExcludeFolders, Nil) :+ "target"
 
-    val javacOpts = settings.task(Keys.javacOptions)
-    // Derive the JDK version (and language level) to use from javacOpts (-source and -target flags)
-    // TODO improve this to also query the java exec at `javaHome` for its version, before falling back to using sbt's runtime jdk version
-    val jdkName = javacOpts.sliding(2).collectFirst { case Seq("-target", v) => JdkName(v) } getOrElse SystemProps.jdkName
-
-    val javaLanguageLevel = javacOpts.sliding(2).collectFirst {
-      case Seq("-source", v) => ValueClasses.formatLanguageLevel(JdkName(v))
-    } getOrElse SystemProps.languageLevel
+    val JavaEnvironment(jdkName, javaLanguageLevel) = `deriveJavaEnvironment or use this JVM's`
 
     val env = IdeaProjectEnvironment(projectJdkName = jdkName, javaLanguageLevel = javaLanguageLevel,
       includeSbtProjectDefinitionModule = !args.contains(NoSbtBuildModule), projectOutputPath = None, excludedFolders = excludeFolders,
@@ -152,11 +145,32 @@ object SbtIdeaPlugin extends Plugin {
 
     state
   }
+  
+  def deriveJavaEnvironment(implicit settings: Settings): Option[JavaEnvironment] = {
+    val javacOpts = settings.task(Keys.javacOptions)
+    // Derive the JDK version (and language level) to use from javacOpts (-source and -target flags)
+    // TODO improve this to also query the java exec at `javaHome` for its version, before falling back to using sbt's runtime jdk version
+    val jdkNameOpt = javacOpts.sliding(2).collectFirst { case Seq("-target", v) => JdkName(v) }
+
+    /** Language level falls back to using the jdk name (the value for -target) if not specifically set */
+    val javaLanguageLevelOpt = (javacOpts.sliding(2).collectFirst {
+      case Seq("-source", v) => JdkName(v)
+    } orElse jdkNameOpt) map ValueClasses.formatLanguageLevel
+
+    (jdkNameOpt, javaLanguageLevelOpt) match {
+      case (Some(n), Some(ll)) => Some(JavaEnvironment(n, ll))
+      case _                   => None
+    }
+  }
+
+  def `deriveJavaEnvironment or use this JVM's`(implicit s: Settings) : JavaEnvironment = {
+    deriveJavaEnvironment getOrElse JavaEnvironment(SystemProps.jdkName)
+  }
 
   def projectData(projectRef: ProjectRef, project: ResolvedProject, buildStruct: BuildStructure,
                   state: State, args: Seq[String], allProjectIds: Set[String], projectRoot: File): SubProjectInfo = {
 
-    val settings = Settings(projectRef, buildStruct, state)
+    implicit val settings = Settings(projectRef, buildStruct, state)
 
     // The SBT project name and id can be different. For single-module projects, we choose the name as the
     // IDEA project name, and for multi-module projects, the id as it must be consistent with the value of SubProjectInfo#dependencyProjects.
@@ -242,7 +256,7 @@ object SbtIdeaPlugin extends Plugin {
 
     SubProjectInfo(baseDirectory, projectName, dependencyProjects, classpathDeps, compileDirectories,
       testDirectories, dependencyLibs, scalaInstance, ideaGroup, None, basePackage, packagePrefix, extraFacets, scalacOptions,
-      includeScalaFacet, androidSupport)
+      includeScalaFacet, androidSupport, deriveJavaEnvironment)
   }
 
 }

@@ -86,7 +86,7 @@ class IdeaProjectDescriptor(val projectInfo: IdeaProjectInfo, val env: IdeaProje
   }
 
   private def projectRootManagerComponent: xml.Node =
-      <component name="ProjectRootManager" version="2" languageLevel={env.javaLanguageLevel.label} assert-keyword="true" jdk-15="true" project-jdk-name={env.projectJdkName.value} project-jdk-type="JavaSDK">
+      <component name="ProjectRootManager" version="2" languageLevel={env.javaLanguageLevel.value} assert-keyword="true" jdk-15="true" project-jdk-name={env.projectJdkName.version} project-jdk-type="JavaSDK">
         <output url="file://$PROJECT_DIR$/target/idea_output" />
       </component>
 

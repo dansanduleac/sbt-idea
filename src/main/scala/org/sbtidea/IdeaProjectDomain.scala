@@ -45,25 +45,39 @@ case class Directories(sources: Seq[File], resources: Seq[File], outDir: File) {
 
 case class DependencyProject(name: String, scope: IdeaLibrary.Scope)
 
+case class JavaEnvironment(jdkName: JdkName, javaLanguageLevel: LanguageLevel)
+
+object JavaEnvironment {
+  /** Shorthand saying language level == jdk name */
+  def apply(jdkName: JdkName) = new JavaEnvironment(jdkName, ValueClasses.formatLanguageLevel(jdkName))
+}
+
 case class SubProjectInfo(baseDir: File, name: String,
                           dependencyProjects: List[DependencyProject],
                           classpathDeps: Seq[(File, Seq[File])], compileDirs: Directories,
                           testDirs: Directories, libraries: Seq[IdeaModuleLibRef], scalaInstance: ScalaInstance,
                           ideaGroup: Option[String], webAppPath: Option[File], basePackage: Option[String],
                           packagePrefix: Option[String], extraFacets: NodeSeq, scalacOptions: Seq[String],
-                          includeScalaFacet: Boolean, androidSupport: Option[AndroidSupport]) {
+                          includeScalaFacet: Boolean, androidSupport: Option[AndroidSupport], javaEnvironmentOpt: Option[JavaEnvironment]) {
   lazy val languageLevel: String = {
     val version = scalaInstance.version
     val binaryScalaVersion = version.take(version.lastIndexOf('.'))
     val virtualized = if (version.contains("virtualized")) " virtualized" else ""
     "Scala " + binaryScalaVersion + virtualized
   }
+
+  // TODO should this be here or in some other place as a function of JavaEnvironment => _ ?
+  lazy val moduleJdk: NodeSeq =
+    javaEnvironmentOpt.fold { <orderEntry type="inheritedJdk"/> } {
+      case JavaEnvironment(jdkName, _) => <orderEntry type="jdk" jdkName={jdkName.version} jdkType="JavaSDK" />
+    }
 }
 
 case class IdeaProjectInfo(baseDir: File, name: String, childProjects: List[SubProjectInfo], ideaLibs: List[IdeaLibrary])
 
 case class IdeaUserEnvironment(webFacet: Boolean)
 
+// TODO change first 2 parameters to use JavaEnvironment
 case class IdeaProjectEnvironment(projectJdkName :JdkName, javaLanguageLevel: LanguageLevel,
                                   includeSbtProjectDefinitionModule: Boolean, projectOutputPath: Option[String],
                                   excludedFolders: Seq[String], compileWithIdea: Boolean, modulePath: String, useProjectFsc: Boolean,
