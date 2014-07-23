@@ -18,7 +18,7 @@ abstract class AbstractScriptedTestBuild(projectName : String) extends Build {
 
 	lazy val scriptedTestSettings = Seq(assertExpectedXmlFiles := assertXmlsTask)
 
-  private def assertXmlsTask {
+  private def assertXmlsTask() {
     val expectedFiles = listFiles(file("."), Array("expected"), true).asScala
     expectedFiles.map(assertExpectedXml).foldLeft[Option[String]](None) {
       (acc, fileResult) => if (acc.isDefined) acc else fileResult
@@ -78,12 +78,11 @@ abstract class AbstractScriptedTestBuild(projectName : String) extends Build {
   object WindowsPathRewriteRule extends RewriteRule {
     override def transform(n: Node): Seq[Node] =
       n match {
-        case e: Elem if (e.attributes.asAttrMap.values.exists(_.contains("\\"))) => {
+        case e: Elem if e.attributes.asAttrMap.values.exists(_.contains("\\")) =>
           e.copy(attributes = for (attr <- e.attributes) yield attr match {
             case a@Attribute(_, v, _) if v.text.contains("\\") => a.goodcopy(value = v.text.replaceAll("\\\\", "/"))
             case other => other
           })
-        }
         case _ => n
       }
   }
@@ -91,13 +90,12 @@ abstract class AbstractScriptedTestBuild(projectName : String) extends Build {
   object JDKVersionRewriteRule extends RewriteRule {
     override def transform(n: Node): Seq[Node] =
       n match {
-        case e: Elem if (e.attributes.asAttrMap.values.exists(_ == "ProjectRootManager")) => {
+        case e: Elem if e.attributes.asAttrMap.values.exists(_ == "ProjectRootManager") =>
           e.copy(attributes = for (attr <- e.attributes) yield attr match {
             case a@Attribute(k, _, _) if k == "languageLevel" => a.goodcopy(value = SystemProps.languageLevel)
             case a@Attribute(k, _, _) if k == "project-jdk-name" => a.goodcopy(value = SystemProps.jdkName)
             case other => other
           })
-        }
         case _ => n
       }
   }
@@ -121,9 +119,9 @@ abstract class AbstractScriptedTestBuild(projectName : String) extends Build {
   object IvyCachePathRewriteRule extends RewriteRule {
     override def transform(n: Node): Seq[Node] =
       n match {
-        case e: Elem if (e.attributes.asAttrMap.keys.exists(_ == "value")) => {
+        case e: Elem if e.attributes.asAttrMap.keys.exists(_ == "value") => {
           e.copy(attributes = for (attr <- e.attributes) yield attr match {
-            case a@Attribute(k, Text(v), _) if (k == "value" && v.contains("/.ivy2/")) => a.goodcopy(value = "~" + v.substring(v.indexOf("/.ivy2/")))
+            case a@Attribute(k, Text(v), _) if k == "value" && v.contains("/.ivy2/") => a.goodcopy(value = "~" + v.substring(v.indexOf("/.ivy2/")))
             case other => other
           })
         }
